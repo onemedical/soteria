@@ -159,38 +159,12 @@ module Soteria
         credentials = nil
 
       else
-        response_hash[:credential_binding_detail].each do |credential|
-
-          bind_detail = credential[:binding_detail]
-
-          if credential[:credential_type] == 'STANDARD_OTP'
-            push_attrs = credential[:push_attributes]
-            credentials.push({
-                                 type: 'STANDARD_OTP',
-                                 enabled: response_hash[:credential_status] == 'ENABLED' && bind_detail[:bind_status] == 'ENABLED',
-                                 friendly_name: bind_detail[:friendly_name],
-                                 push: push_check(push_attrs),
-                                 credential_id: credential[:credential_id]
-                             })
-
-          elsif credential[:credential_type] == 'SMS_OTP'
-            credentials.push({
-                                 type: 'SMS_OTP',
-                                 enabled: response_hash[:credential_status] == 'ENABLED' && bind_detail[:bind_status] == 'ENABLED',
-                                 friendly_name: bind_detail[:friendly_name],
-                                 push: false,
-                                 credential_id: credential[:credential_id]
-                             })
-          elsif credential[:credential_type] == 'VOICE_OTP'
-            credentials.push({
-                                 type: 'VOICE_OTP',
-                                 enabled: response_hash[:credential_status] == 'ENABLED' && bind_detail[:bind_status] == 'ENABLED',
-                                 friendly_name: bind_detail[:friendly_name],
-                                 push: false,
-                                 credential_id: credential[:credential_id]
-                             })
+        if response_hash[:credential_binding_detail].is_a? Array
+          response_hash[:credential_binding_detail].each do |credential|
+            extract_credentials(credential, credentials, response_hash)
           end
-
+        else
+          extract_credentials(response_hash[:credential_binding_detail], credentials, response_hash)
         end
 
       end
@@ -199,7 +173,6 @@ module Soteria
       ret[:credentials] = credentials
       ret
     end
-
 
     # Use updateUser to update information about a user in VIP User Services.
     #
@@ -381,9 +354,11 @@ module Soteria
     # @param [Array] attrs A array of hash attributes
     # @return [Boolean] If push is enabled for the give attributes
     def push_check(attrs)
-      attrs.each do |a|
-        if a[:key] == 'PUSH_ENABLED'
-          return a[:value]
+      unless attrs.nil?
+        attrs.each do |a|
+          if a[:key] == 'PUSH_ENABLED'
+            return a[:value].is_a?(String) ? a[:value] == 'TRUE' : a[:value]
+          end
         end
       end
       false
@@ -402,6 +377,40 @@ module Soteria
           message: response_hash[:status_message],
           id: response_hash[:request_id]
       }
+    end
+
+    private
+
+    def extract_credentials(credential, credentials, response_hash)
+      bind_detail = credential[:binding_detail]
+
+      if credential[:credential_type] == 'STANDARD_OTP'
+        push_attrs = credential[:push_attributes]
+        credentials.push({
+          type: 'STANDARD_OTP',
+          enabled: response_hash[:credential_status] == 'ENABLED' && bind_detail[:bind_status] == 'ENABLED',
+          friendly_name: bind_detail[:friendly_name],
+          push: push_check(push_attrs),
+          credential_id: credential[:credential_id]
+        })
+
+      elsif credential[:credential_type] == 'SMS_OTP'
+        credentials.push({
+          type: 'SMS_OTP',
+          enabled: response_hash[:credential_status] == 'ENABLED' && bind_detail[:bind_status] == 'ENABLED',
+          friendly_name: bind_detail[:friendly_name],
+          push: false,
+          credential_id: credential[:credential_id]
+        })
+      elsif credential[:credential_type] == 'VOICE_OTP'
+        credentials.push({
+          type: 'VOICE_OTP',
+          enabled: response_hash[:credential_status] == 'ENABLED' && bind_detail[:bind_status] == 'ENABLED',
+          friendly_name: bind_detail[:friendly_name],
+          push: false,
+          credential_id: credential[:credential_id]
+        })
+      end
     end
 
   end
